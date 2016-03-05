@@ -14,6 +14,12 @@
     `(let ,binds
        ,sym)))
 
+;; (expr ...) -> (let ((tmp1 expr1) ... (tmpn exprn)) tmpn)
+(defun sequence-to-ssa (exprs env)
+  (destructuring-bind (sym &rest binds) (sequence-to-gensym exprs env)
+    `(let ,binds
+       ,sym)))
+
 
 ;; (expr env) -> (gensym . (... (gensym expr)))
 (defun to-gensym (expr env)
@@ -22,6 +28,18 @@
   (cond
     ((atom expr) (to-gensym-atom expr env))
     (t (to-gensym-cons expr env))))
+
+
+
+;; ((expr1 ... exprn) env)  -> (gensymn . (((gynsym1 expr1)... (gensymn exprn)))
+(defun sequence-to-gensym (exprs env)
+  (reduce (lambda (acc e) (destructuring-bind (_ . vars) acc
+                        (declare (ignore _))
+                        (destructuring-bind (gensym-e . vars-e) (to-gensym e env)
+                          (cons gensym-e (append vars vars-e)))))
+          exprs
+          ;; FIXME: correct initial value
+          :initial-value '(nil . nil)))
 
 
 ;;; atom
@@ -63,8 +81,8 @@
       ((unwind-protect)       (to-gensym-unwind-protect sym expr env))
       #+openmcl
       ((ccl:compiler-let)     (to-gensym-ccl:compiler-let sym expr env))
-      ((values)               (to-gensym-values sym expr env))
-      ((values-list)          (to-gensym-values-list sym expr env))
+      ;; ((values)               (to-gensym-values sym expr env))
+      ;; ((values-list)          (to-gensym-values-list sym expr env))
       (t (multiple-value-bind (expantion expanded-p) (macroexpand-1 expr env)
            (if expanded-p
                (to-gensym expantion env)
@@ -80,20 +98,34 @@
 
 ;;; BLOCK
 (defun to-gensym-block (sym expr env)
-  "transformation of `BLOCK`.
+  "transformation of `BLOCK'.
 See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_block.htm#block"
   (destructuring-bind (name blk-name &rest body) expr
-    (let* ((body (to-ssa (cons 'progn body) env))
+    (let* ((body (sequence-to-ssa body env))
            (expr (cons name (cons blk-name body))))
       (make-result sym expr ()))))
 
+;;; CATCH
 (defun to-gensym-catch (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+  "transformation of `CATCH'.
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_catch.htm#catch"
+  (destructuring-bind (name cth-name &rest body) expr
+    (let ((body (sequence-to-ssa body env))
+          (expr (cons name (cons cth-name body))))
+      (make-result sym expr ()))))
+
+;;; EVAL-WHEN
 (defun to-gensym-eval-when (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+  "transformation of `EVAL-WHEN'.
+See"
+  (destructuring-bind (name situations &rest form) expr
+    (let* ((form (sequence-to-ssa form env))
+           (expr (list name situations form)))
+      (make-result sym expr ()))))
+
 (defun to-gensym-flet (sym expr env)
+  "transformation of `FLET'.
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_flet_.htm#flet"
   (declare (ignore sym expr env))
   (error 'unimplemented))
 
@@ -138,12 +170,25 @@ See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_go.htm#go"
 (defun to-gensym-multiple-value-prog1 (sym expr env)
   (declare (ignore sym expr env))
   (error 'unimplemented))
+
+;;; PROGN
 (defun to-gensym-progn (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+  "transformation of `PROGN'.
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_progn.htm#progn"
+  (destructuring-bind (name &rest body) expr
+    (make-result sym (list name (sequence-to-ssa body env)) ())))
+
+
+;;; PROGV
 (defun to-gensym-progv (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+  "transformation of `PROGV'.
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_progv.htm#progv"
+  (destructuring-bind (name symbols values &rest body) expr
+    (let* ((symbols (to-gensym symbols env))
+           (values  (to-gensym values env))
+           (body    (sequence-to-ssa body env))
+           (expr    (list name (car symbols) (car values) body)))
+      (make-result sym expr (append (cdr symbols) (cdr values))))))
 
 ;;; QUOTE
 (defun to-gensym-quote (sym expr env)
@@ -185,21 +230,47 @@ See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_setq.htm#setq"
 (defun to-gensym-the (sym expr env)
   (declare (ignore sym expr env))
   (error 'unimplemented))
+
+;;; THROW
 (defun to-gensym-throw (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+  "transformation of `THROW'.
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_throw.htm#throw"
+  (destructuring-bind (name tag result-form) expr
+    (let* ((result-form (to-gensym result-form env))
+           (expr   (list name tag (car result-form))))
+      (make-result sym expr (cdr result-form)))))
+
+
+;;; UNWIND-PROTECT
 (defun to-gensym-unwind-protect (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+  "transformation of `UNWIND-PROTECT'.
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_unwind.htm#unwind-protect"
+  (destructuring-bind (name protected &rest cleans) expr
+    (let* ((protected (to-ssa protected env))
+           (cleans    (sequence-to-ssa cleans env))
+           (expr      (list name protected cleans)))
+      (make-result sym expr ()))))
+
 #+openmcl
 (defun to-gensym-ccl:compiler-let (sym expr env)
   (error 'unimplemented))
-(defun to-gensym-values (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
-(defun to-gensym-values-list (sym expr env)
-  (declare (ignore sym expr env))
-  (error 'unimplemented))
+
+;; ;;; VALUES
+;; (defun to-gensym-values (sym expr env)
+;;   "transformation of `VALUES'
+;; See http://clhs.lisp.se/Body/f_values.htm"
+;;   (error 'unimplemented)
+;;   (destructuring-bind (name &rest values) expr
+;;     (let* ((values (mapcar (lambda (value) (to-gensym value env)) values))
+;;            (syms   (mapcar #'car values))
+;;            (vars   (mapcar #'cdr values))
+;;            (expr   (cons name syms)))
+;;       ;; you should treat values
+;;       (make-result sym expr (apply #'append vars)))))
+
+;; (defun to-gensym-values-list (sym expr env)
+;;   (declare (ignore sym expr env))
+;;   (error 'unimplemented))
 
 
 ;;; funtion call
