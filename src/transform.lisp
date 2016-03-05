@@ -117,7 +117,7 @@ See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_catch.htm#catch"
 ;;; EVAL-WHEN
 (defun to-gensym-eval-when (sym expr env)
   "transformation of `EVAL-WHEN'.
-See"
+See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_eval_w.htm#eval-when"
   (destructuring-bind (name situations &rest form) expr
     (let* ((form (sequence-to-ssa form env))
            (expr (list name situations form)))
