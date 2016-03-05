@@ -1,5 +1,9 @@
 # Cl-Fast-Cont
 
+Yet another (partial) continuation library that combine CPS transformation and SSA transformation.
+
+
+
 ## Usage
 
 ## Installation
