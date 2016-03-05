@@ -133,8 +133,8 @@ See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_flet_.htm#flet"
 (defun to-gensym-function (sym expr env)
   "transformation of `FUNCTION'.
 See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_fn.htm"
-  (declare (ignore env))
-  (make-result sym expr ()))
+  (declare (ignore sym expr env))
+  (error 'unimplemented))
 
 ;;; GO
 (defun to-gensym-go (sym expr env)
