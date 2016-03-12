@@ -13,7 +13,7 @@
 [load-time-value](http://clhs.lisp.se/Body/s_ld_tim.htm)
 [locally](http://clhs.lisp.se/Body/s_locall.htm)
 [macrolet](http://www.lispworks.com/documentation/HyperSpec/Body/s_flet_.htm)
-[multiple-value-call](http://clhs.lisp.se/Body/m_multip.htm)
+[multiple-value-call](http://clhs.lisp.se/Body/s_multip.htm#multiple-value-call)
 [multiple-value-prog1](http://clhs.lisp.se/Body/s_mult_1.htm)
 [progn](http://www.lispworks.com/documentation/lw70/CLHS/Body/s_progn.htm)
 [progv](http://www.lispworks.com/documentation/lw70/CLHS/Body/s_progv.htm)
