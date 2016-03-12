@@ -221,7 +221,7 @@ See http://www.lispworks.com/documentation/lw70/CLHS/Body/s_setq.htm#setq"
       (make-result sym (cons name bindings) (apply #'append (mapcar #'cadr vars))))))
 
 
-(defun to-gensym-symbol-macrolet (sym expr env)
+(defun to-gensym-symbol-symbol-macrolet (sym expr env)
   (declare (ignore sym expr env))
   (error 'unimplemented))
 (defun to-gensym-tagbody (sym expr env)
